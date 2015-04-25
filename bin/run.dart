@@ -44,15 +44,51 @@ Duration weatherTickRate = new Duration(seconds: 5);
 SimpleNode rootNode;
 
 updateTrackers() async {
-  for (var node in rootNode.children.values) {
+  for (SimpleNode node in rootNode.children.values) {
     if (node.getConfig(r"$invokable") != null) {
       continue;
     }
 
     var city = node.getConfig(r"$city");
     var info = await getWeatherInformation(city);
-    node.getChild("Condition").updateValue(info["condition"]);
-    node.getChild("Temperature").updateValue(info["temperature"]);
+    SimpleNode l(String name) {
+      return node.getChild(name);
+    }
+    l("Condition").updateValue(info["condition"]);
+    l("Temperature").updateValue(info["temperature"]);
+    l("Wind_Chill").updateValue(info["wind chill"]);
+    l("Wind_Speed").updateValue(info["wind speed"]);
+    l("Wind_Direction").updateValue(info["wind direction"]);
+    l("Humidity").updateValue(info["humidity"]);
+    l("Pressure").updateValue(info["pressure"]);
+    l("Visibility").updateValue(info["visibility"]);
+    SimpleNode forecast = node.getChild("Forecast");
+    var fi = info["forecast"];
+
+    for (var c in forecast.children.keys.toList()) {
+      forecast.removeChild(c);
+    }
+
+    for (var x in fi) {
+      link.provider.addNode("${node.path}/Forecast/${x["day"]}", {
+        "Date": {
+          r"$type": "string",
+          "?value": x["date"]
+        },
+        "Condition": {
+          r"$type": "string",
+          "?value": x["text"]
+        },
+        "High": {
+          r"$type": "number",
+          "?value": x["high"]
+        },
+        "Low": {
+          r"$type": "number",
+          "?value": x["low"]
+        }
+      });
+    }
   }
 }
 
@@ -78,6 +114,35 @@ class CreateTrackerNode extends SimpleNode {
       "Temperature": {
         r"$type": "number",
         "?value": null
+      },
+      "Wind_Chill": {
+        r"$name": "Wind Chill",
+        r"$type": "number",
+        "?value": null
+      },
+      "Wind_Speed": {
+        r"$name": "Wind Speed",
+        r"$type": "number",
+        "?value": null
+      },
+      "Humidity": {
+        r"$type": "number",
+        "?value": null
+      },
+      "Pressure": {
+        r"$type": "number",
+        "?value": null
+      },
+      "Visibility": {
+        r"$type": "number",
+        "?value": null
+      },
+      "Wind_Direction": {
+        r"$name": "Wind Direction",
+        r"$type": "number",
+        "?value": null
+      },
+      "Forecast": {
       },
       "Delete Tracker": {
         r"$is": "deleteTracker",
@@ -114,10 +179,19 @@ Future<Map<String, dynamic>> getWeatherInformation(String city) async {
   }
 
   var c = info["channel"]["item"]["condition"];
+  var wind = info["channel"]["wind"];
+  var at = info["channel"]["atmosphere"];
 
   return {
     "condition": c["text"],
-    "temperature": c["temp"]
+    "temperature": c["temp"],
+    "wind speed": wind["speed"],
+    "wind chill": wind["chill"],
+    "wind direction": wind["direction"],
+    "humidity": at["humidity"],
+    "pressure": at["pressure"],
+    "visibility": at["visibility"],
+    "forecast": info["channel"]["item"]["forecast"]
   };
 }
 
