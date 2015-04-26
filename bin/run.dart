@@ -51,6 +51,9 @@ updateTrackers() async {
 
     var city = node.getConfig(r"$city");
     var info = await getWeatherInformation(city);
+    if (info == null) {
+      continue;
+    }
     SimpleNode l(String name) {
       return node.getChild(name);
     }
@@ -175,7 +178,7 @@ class DeleteTrackerNode extends SimpleNode {
 Future<Map<String, dynamic>> getWeatherInformation(String city) async {
   var info = await queryWeather(buildQuery(city));
   if (info == null) {
-    return {};
+    return null;
   }
 
   var c = info["channel"]["item"]["condition"];
@@ -200,12 +203,16 @@ String buildQuery(String city) {
 }
 
 Future<Map<String, dynamic>> queryWeather(String yql) async {
-  yql = Uri.encodeComponent(yql);
+  try {
+    yql = Uri.encodeComponent(yql);
 
-  var url = "https://query.yahooapis.com/v1/public/yql?q=${yql}&format=json&env=s${Uri.encodeComponent("store://datatables.org/alltableswithkeys")}";
-  http.Response response = await client.get(url);
+    var url = "https://query.yahooapis.com/v1/public/yql?q=${yql}&format=json&env=s${Uri.encodeComponent("store://datatables.org/alltableswithkeys")}";
+    http.Response response = await client.get(url);
 
-  var json = JSON.decode(response.body);
+    var json = JSON.decode(response.body);
 
-  return json["query"]["results"];
+    return json["query"]["results"];
+  } catch (e) {
+    return null;
+  }
 }
