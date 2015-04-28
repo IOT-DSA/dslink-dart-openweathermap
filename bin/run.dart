@@ -26,7 +26,7 @@ main(List<String> args) async {
   }, profiles: {
     "createTracker": (String path) => new CreateTrackerNode(path),
     "deleteTracker": (String path) => new DeleteTrackerNode(path)
-  });
+  }, encodePrettyJson: true);
 
   if (link.link == null) return;
 
