@@ -198,6 +198,8 @@ Future<Map<String, dynamic>> getWeatherInformation(String city) async {
   };
 }
 
+const String urlBase = "https://query.yahooapis.com/v1/public/yql";
+
 String buildQuery(String city) {
   return 'select * from weather.forecast where woeid in (select woeid from geo.places(1) where text="${city}")';
 }
@@ -206,7 +208,7 @@ Future<Map<String, dynamic>> queryWeather(String yql) async {
   try {
     yql = Uri.encodeComponent(yql);
 
-    var url = "https://query.yahooapis.com/v1/public/yql?q=${yql}&format=json&env=s${Uri.encodeComponent("store://datatables.org/alltableswithkeys")}";
+    var url = "${urlBase}?q=${yql}&format=json&env=s${Uri.encodeComponent("store://datatables.org/alltableswithkeys")}";
     http.Response response = await client.get(url);
 
     var json = JSON.decode(response.body);
