@@ -39,7 +39,7 @@ main(List<String> args) async {
   link.connect();
 }
 
-Duration weatherTickRate = new Duration(seconds: 5);
+Duration weatherTickRate = new Duration(seconds: 10);
 
 SimpleNode rootNode;
 
