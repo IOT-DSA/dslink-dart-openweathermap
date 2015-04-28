@@ -209,6 +209,7 @@ Future<Map<String, dynamic>> queryWeather(String yql) async {
     yql = Uri.encodeComponent(yql);
 
     var url = "${urlBase}?q=${yql}&format=json&env=s${Uri.encodeComponent("store://datatables.org/alltableswithkeys")}";
+
     http.Response response = await client.get(url);
 
     var json = JSON.decode(response.body);
