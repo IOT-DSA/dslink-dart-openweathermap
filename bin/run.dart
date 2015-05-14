@@ -12,10 +12,11 @@ LinkProvider link;
 
 main(List<String> args) async {
   link = new LinkProvider(args, "Weather-", command: "run", defaultNodes: {
-    "Create Tracker": {
+    "Create_Tracker": {
       r"$is": "createTracker",
       r"$invokable": "write",
       r"$result": "values",
+      r"$name": "Create Tracker",
       r"$params": [
         {
           "name": "city",
@@ -147,11 +148,12 @@ class CreateTrackerNode extends SimpleNode {
       },
       "Forecast": {
       },
-      "Delete Tracker": {
+      "Delete_Tracker": {
         r"$is": "deleteTracker",
         r"$invokable": "write",
         r"$result": "values",
-        r"$params": {}
+        r"$params": {},
+        r"$name": "Delete Tracker"
       }
     });
 
