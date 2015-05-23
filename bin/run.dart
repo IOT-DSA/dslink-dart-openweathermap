@@ -29,9 +29,7 @@ main(List<String> args) async {
     "deleteTracker": (String path) => new DeleteTrackerNode(path)
   }, encodePrettyJson: true);
 
-  if (link.link == null) return;
-
-  rootNode = link.provider.getNode("/");
+  rootNode = link["/"];
 
   new Timer.periodic(weatherTickRate, (timer) async {
     await updateTrackers();
@@ -74,7 +72,7 @@ updateTrackers() async {
     }
 
     for (var x in fi) {
-      link.provider.addNode("${node.path}/Forecast/${x["day"]}", {
+      link.addNode("${node.path}/Forecast/${x["day"]}", {
         "Date": {
           r"$type": "string",
           "?value": x["date"]
@@ -108,7 +106,7 @@ class CreateTrackerNode extends SimpleNode {
     var city = params["city"];
     var id = CryptoUtils.bytesToBase64(city.codeUnits);
 
-    link.provider.addNode("/${id}", {
+    link.addNode("/${id}", {
       r"$name": city,
       r"$city": city,
       "Condition": {
@@ -171,7 +169,7 @@ class DeleteTrackerNode extends SimpleNode {
   @override
   Object onInvoke(Map<String, dynamic> params) {
     var p = path.split("/").take(2).join("/");
-    link.provider.removeNode(p);
+    link.removeNode(p);
     link.save();
     return {};
   }
