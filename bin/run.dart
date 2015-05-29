@@ -4,7 +4,6 @@ import "dart:convert";
 import "package:dslink/client.dart";
 import "package:dslink/responder.dart";
 import "package:http/http.dart" as http;
-import "package:crypto/crypto.dart";
 
 http.Client client = new http.Client();
 
@@ -57,13 +56,17 @@ updateTrackers() async {
       return node.getChild(name);
     }
     l("Condition").updateValue(info["condition"]);
-    l("Temperature").updateValue(info["temperature"]);
-    l("Wind_Chill").updateValue(info["wind chill"]);
-    l("Wind_Speed").updateValue(info["wind speed"]);
+    l("Temperature")..attributes["@unit"] = info["units"]["temperature"]..updateValue(info["temperature"]);
+    l("Wind_Chill")..attributes["@unit"] = info["units"]["temperature"]..updateValue(info["wind chill"]);
+    l("Wind_Speed")..attributes["@unit"] = info["units"]["speed"]..updateValue(info["wind speed"]);
     l("Wind_Direction").updateValue(info["wind direction"]);
     l("Humidity").updateValue(info["humidity"]);
-    l("Pressure").updateValue(info["pressure"]);
-    l("Visibility").updateValue(info["visibility"]);
+    l("Pressure")..attributes["@unit"] = info["units"]["pressure"]..updateValue(info["pressure"]);
+    l("Visibility")..attributes["@unit"] = info["units"]["distance"]..updateValue(info["visibility"]);
+    try {
+      l("Sunrise").updateValue(info["sunrise"]);
+      l("Sunset").updateValue(info["sunset"]);
+    } catch (e) {}
     SimpleNode forecast = node.getChild("Forecast");
     var fi = info["forecast"];
 
@@ -98,13 +101,29 @@ class CreateTrackerNode extends SimpleNode {
   CreateTrackerNode(String path) : super(path);
 
   @override
-  Object onInvoke(Map<String, dynamic> params) {
+  Object onInvoke(Map<String, dynamic> params) async {
     if (params["city"] == null) {
       return {};
     }
 
     var city = params["city"];
-    var id = CryptoUtils.bytesToBase64(city.codeUnits);
+    Map data = await queryWeather(buildQuery(city));
+
+    if (data == null) {
+      return {};
+    }
+
+    var loc = data["channel"]["location"];
+
+    if (loc == null) {
+      return {};
+    }
+
+    var id = "${loc["city"]}-${loc["region"]}-${loc["country"]}";
+
+    if ((link.provider as SimpleNodeProvider).nodes.containsKey("/${id}")) {
+      return {};
+    }
 
     link.addNode("/${id}", {
       r"$name": city,
@@ -144,6 +163,14 @@ class CreateTrackerNode extends SimpleNode {
         r"$type": "number",
         "?value": null
       },
+      "Sunrise": {
+        r"$type": "string",
+        "?value": null
+      },
+      "Sunset": {
+        r"$type": "string",
+        "?value": null
+      },
       "Forecast": {
       },
       "Delete_Tracker": {
@@ -175,26 +202,36 @@ class DeleteTrackerNode extends SimpleNode {
   }
 }
 
-Future<Map<String, dynamic>> getWeatherInformation(String city) async {
-  var info = await queryWeather(buildQuery(city));
+Future<Map<String, dynamic>> getWeatherInformation(cl) async {
+  Map info;
+  if (cl is Map) {
+    info = cl;
+  } else {
+    info = await queryWeather(buildQuery(cl));
+  }
+
   if (info == null) {
     return null;
   }
 
   var c = info["channel"]["item"]["condition"];
   var wind = info["channel"]["wind"];
+  var astronomy = info["channel"]["astronomy"];
   var at = info["channel"]["atmosphere"];
 
   return {
     "condition": c["text"],
     "temperature": c["temp"],
+    "sunrise": astronomy["sunrise"],
+    "sunset": astronomy["sunset"],
     "wind speed": wind["speed"],
     "wind chill": wind["chill"],
     "wind direction": wind["direction"],
     "humidity": at["humidity"],
     "pressure": at["pressure"],
     "visibility": at["visibility"],
-    "forecast": info["channel"]["item"]["forecast"]
+    "forecast": info["channel"]["item"]["forecast"],
+    "units": info["channel"]["units"]
   };
 }
 
