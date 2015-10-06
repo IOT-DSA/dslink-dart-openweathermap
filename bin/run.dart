@@ -10,29 +10,35 @@ http.Client client = new http.Client();
 LinkProvider link;
 
 main(List<String> args) async {
-  link = new LinkProvider(args, "Weather-", command: "run", defaultNodes: {
-    "Create_Tracker": {
-      r"$is": "createTracker",
-      r"$invokable": "write",
-      r"$result": "values",
-      r"$name": "Create Tracker",
-      r"$params": [
-        {
-          "name": "city",
-          "type": "string"
-        }
-      ]
-    }
-  }, profiles: {
+  link = new LinkProvider(args, "Weather-", command: "run", profiles: {
     "createTracker": (String path) => new CreateTrackerNode(path),
     "deleteTracker": (String path) => new DeleteTrackerNode(path)
   }, encodePrettyJson: true);
 
   rootNode = link["/"];
 
+  link.addNode("/Create_Tracker", {
+    r"$is": "createTracker",
+    r"$invokable": "write",
+    r"$result": "values",
+    r"$name": "Create Tracker",
+    r"$params": [
+      {
+        "name": "city",
+        "type": "string"
+      },
+      {
+        "name": "temperatureUnits",
+        "type": "enum[Fahrenheit,Celsius]"
+      }
+    ]
+  });
+
   new Timer.periodic(weatherTickRate, (timer) async {
     await updateTrackers();
   });
+
+  updateTrackers();
 
   link.connect();
 }
@@ -47,6 +53,10 @@ updateTrackers() async {
       continue;
     }
 
+    var unitType = node.configs[r"$temperature_units"];
+    if (unitType == null) {
+      unitType = "Fahrenheit";
+    }
     var city = node.getConfig(r"$city");
     var info = await getWeatherInformation(city);
     if (info == null) {
@@ -56,8 +66,40 @@ updateTrackers() async {
       return node.getChild(name);
     }
     l("Condition").updateValue(info["condition"]);
-    l("Temperature")..attributes["@unit"] = info["units"]["temperature"]..updateValue(info["temperature"]);
-    l("Wind_Chill")..attributes["@unit"] = info["units"]["temperature"]..updateValue(info["wind chill"]);
+
+    var tempNode = l("Temperature");
+    var windChillNode = l("Wind_Chill");
+
+    var gotTemperatureUnits = info["units"]["temperature"];
+    var gotTemperature = info["temperature"];
+    var gotWindChill = info["wind chill"];
+
+    try {
+      if (gotTemperature is String) {
+        gotTemperature = num.parse(gotTemperature);
+      }
+
+      if (gotWindChill is String) {
+        gotWindChill = num.parse(gotWindChill);
+      }
+    } catch (e) {}
+
+    var useTemperatureUnits = gotTemperatureUnits;
+
+    if (gotTemperatureUnits == "F" && unitType == "Celsius") {
+      gotTemperature = (gotTemperature - 32) * (5 / 9);
+      gotWindChill = (gotWindChill - 32) * (5 / 9);
+      useTemperatureUnits = "C";
+    } else if (gotTemperatureUnits == "C" && unitType == "Fahrenheit") {
+      gotTemperature = (gotTemperature * (9 / 5)) + 32;
+      gotWindChill = (gotWindChill * (9 / 5)) + 32;
+      useTemperatureUnits = "F";
+    }
+
+    tempNode.updateValue(gotTemperature);
+    windChillNode.updateValue(gotWindChill);
+    tempNode.attributes["@unit"] = windChillNode.attributes["@unit"] = "°${useTemperatureUnits}";
+
     l("Wind_Speed")..attributes["@unit"] = info["units"]["speed"]..updateValue(info["wind speed"]);
     l("Wind_Direction").updateValue(info["wind direction"]);
     l("Humidity").updateValue(info["humidity"]);
@@ -75,6 +117,27 @@ updateTrackers() async {
     }
 
     for (var x in fi) {
+      var gotHigh = x["high"];
+      var gotLow = x["low"];
+
+      try {
+        if (gotHigh is String) {
+          gotHigh = num.parse(gotHigh);
+        }
+
+        if (gotLow is String) {
+          gotLow = num.parse(gotLow);
+        }
+      } catch (e) {}
+
+      if (gotTemperatureUnits == "F" && unitType == "Celsius") {
+        gotHigh = (gotHigh - 32) * (5 / 9);
+        gotLow = (gotLow - 32) * (5 / 9);
+      } else if (gotTemperatureUnits == "C" && unitType == "Fahrenheit") {
+        gotHigh = (gotHigh * (9 / 5)) + 32;
+        gotLow = (gotLow * (9 / 5)) + 32;
+      }
+
       link.addNode("${node.path}/Forecast/${x["day"]}", {
         "Date": {
           r"$type": "string",
@@ -106,6 +169,7 @@ class CreateTrackerNode extends SimpleNode {
       return {};
     }
 
+    var temperatureUnits = params["temperatureUnits"];
     var city = params["city"];
     Map data = await queryWeather(buildQuery(city));
 
@@ -122,12 +186,13 @@ class CreateTrackerNode extends SimpleNode {
     var id = "${loc["city"]}-${loc["region"]}-${loc["country"]}";
 
     if ((link.provider as SimpleNodeProvider).nodes.containsKey("/${id}")) {
-      return {};
+      link.removeNode("/${id}");
     }
 
     link.addNode("/${id}", {
       r"$name": city,
       r"$city": city,
+      r"$temperature_units": temperatureUnits,
       "Condition": {
         r"$type": "string",
         "?value": "Unknown"
@@ -214,6 +279,7 @@ Future<Map<String, dynamic>> getWeatherInformation(cl) async {
     return null;
   }
 
+
   var c = info["channel"]["item"]["condition"];
   var wind = info["channel"]["wind"];
   var astronomy = info["channel"]["astronomy"];
@@ -245,7 +311,7 @@ Future<Map<String, dynamic>> queryWeather(String yql) async {
   try {
     yql = Uri.encodeComponent(yql);
 
-    var url = "${urlBase}?q=${yql}&format=json&env=s${Uri.encodeComponent("store://datatables.org/alltableswithkeys")}";
+    var url = "${urlBase}?q=${yql}&format=json&env=${Uri.encodeComponent("store://datatables.org/alltableswithkeys")}";
 
     http.Response response = await client.get(url);
 
