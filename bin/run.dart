@@ -28,8 +28,8 @@ main(List<String> args) async {
         "type": "string"
       },
       {
-        "name": "temperatureUnits",
-        "type": "enum[Fahrenheit,Celsius]"
+        "name": "units",
+        "type": "enum[Imperial,Metric]"
       }
     ]
   });
@@ -53,9 +53,13 @@ updateTrackers() async {
       continue;
     }
 
-    var unitType = node.configs[r"$temperature_units"];
+    var unitType = node.configs[r"$units_type"];
     if (unitType == null) {
-      unitType = "Fahrenheit";
+      if (node.configs.containsKey(r"$temperature_units")) {
+        unitType = node.configs[r"$temperature_units"] == "Fahrenheit" ? "Imperial" : "Metric";
+      } else {
+        unitType = "Imperial";
+      }
     }
     var city = node.getConfig(r"$city");
     var info = await getWeatherInformation(city);
@@ -84,27 +88,49 @@ updateTrackers() async {
       }
     } catch (e) {}
 
-    var useTemperatureUnits = gotTemperatureUnits;
+    var useTemperatureUnits = "°${gotTemperatureUnits}";
 
-    if (gotTemperatureUnits == "F" && unitType == "Celsius") {
-      gotTemperature = (gotTemperature - 32) * (5 / 9);
-      gotWindChill = (gotWindChill - 32) * (5 / 9);
-      useTemperatureUnits = "C";
-    } else if (gotTemperatureUnits == "C" && unitType == "Fahrenheit") {
-      gotTemperature = (gotTemperature * (9 / 5)) + 32;
-      gotWindChill = (gotWindChill * (9 / 5)) + 32;
-      useTemperatureUnits = "F";
-    }
+    var temp = convertToUnits(gotTemperature, useTemperatureUnits, unitType);
+    var windChill = convertToUnits(gotWindChill, useTemperatureUnits, unitType);
 
-    tempNode.updateValue(gotTemperature);
-    windChillNode.updateValue(gotWindChill);
-    tempNode.attributes["@unit"] = windChillNode.attributes["@unit"] = "°${useTemperatureUnits}";
+    tempNode.updateValue(temp.left);
+    windChillNode.updateValue(windChill.left);
+    tempNode.attributes["@unit"] = temp.right;
+    windChillNode.attributes["@unit"] = windChill.right;
 
-    l("Wind_Speed")..attributes["@unit"] = info["units"]["speed"]..updateValue(info["wind speed"]);
+    var windSpeedNode = l("Wind_Speed");
+    var visibilityNode = l("Visibility");
+    var pressureNode = l("Pressure");
+    var humidityNode = l("Humidity");
+
+    humidityNode.updateValue(info["humidity"]);
+
+    var gotWindSpeed = info["wind speed"];
+    var gotVisibility = info["visibility"];
+    var gotPressure = info["pressure"];
+
+    try {
+      gotWindSpeed = num.parse(gotWindSpeed);
+      gotVisibility = num.parse(gotVisibility);
+      gotPressure = num.parse(gotPressure);
+    } catch (e) {}
+
+    var speedUnit = info["units"]["speed"];
+    var pressureUnit = info["units"]["pressure"];
+    var distanceUnit = info["units"]["distance"];
+
+    var windSpeed = convertToUnits(gotWindSpeed, speedUnit, unitType);
+    var pressure = convertToUnits(gotPressure, pressureUnit, unitType);
+    var visibility = convertToUnits(gotVisibility, distanceUnit, unitType);
+    
+    windSpeedNode.updateValue(windSpeed.left);
+    windSpeedNode.configs["@unit"] = windSpeed.right;
+    pressureNode.updateValue(pressure.left);
+    pressureNode.configs["@unit"] = pressure.right;
+    visibilityNode.updateValue(visibility.left);
+    visibilityNode.configs["@unit"] = visibility.right;
+
     l("Wind_Direction").updateValue(info["wind direction"]);
-    l("Humidity").updateValue(info["humidity"]);
-    l("Pressure")..attributes["@unit"] = info["units"]["pressure"]..updateValue(info["pressure"]);
-    l("Visibility")..attributes["@unit"] = info["units"]["distance"]..updateValue(info["visibility"]);
     try {
       l("Sunrise").updateValue(info["sunrise"]);
       l("Sunset").updateValue(info["sunset"]);
@@ -112,11 +138,11 @@ updateTrackers() async {
     SimpleNode forecast = node.getChild("Forecast");
     var fi = info["forecast"];
 
-    for (var c in forecast.children.keys.toList()) {
-      forecast.removeChild(c);
-    }
+    var names = [];
 
     for (var x in fi) {
+      var dayName = x["day"];
+      names.add(dayName);
       var gotHigh = x["high"];
       var gotLow = x["low"];
 
@@ -130,32 +156,51 @@ updateTrackers() async {
         }
       } catch (e) {}
 
-      if (gotTemperatureUnits == "F" && unitType == "Celsius") {
-        gotHigh = (gotHigh - 32) * (5 / 9);
-        gotLow = (gotLow - 32) * (5 / 9);
-      } else if (gotTemperatureUnits == "C" && unitType == "Fahrenheit") {
-        gotHigh = (gotHigh * (9 / 5)) + 32;
-        gotLow = (gotLow * (9 / 5)) + 32;
-      }
+      var high = convertToUnits(gotHigh, useTemperatureUnits, unitType);
+      var low = convertToUnits(gotLow, useTemperatureUnits, unitType);
+      var p = "${node.path}/Forecast/${dayName}";
+      var exists = (link.provider as SimpleNodeProvider).nodes.containsKey(p);
 
-      link.addNode("${node.path}/Forecast/${x["day"]}", {
-        "Date": {
-          r"$type": "string",
-          "?value": x["date"]
-        },
-        "Condition": {
-          r"$type": "string",
-          "?value": x["text"]
-        },
-        "High": {
-          r"$type": "number",
-          "?value": x["high"]
-        },
-        "Low": {
-          r"$type": "number",
-          "?value": x["low"]
-        }
-      });
+      if (exists) {
+        var dateNode = link["${p}/Date"];
+        var conditionNode = link["${p}/Condition"];
+        var highNode = link["${p}/High"];
+        var lowNode = link["${p}/Low"];
+        dateNode.updateValue(x["date"]);
+        conditionNode.updateValue(x["text"]);
+        highNode.updateValue(high.left);
+        lowNode.updateValue(low.left);
+        highNode.configs[r"@unit"] = high.right;
+        lowNode.configs[r"@unit"] = low.right;
+      } else {
+        link.addNode("${node.path}/Forecast/${dayName}", {
+          "Date": {
+            r"$type": "string",
+            "?value": x["date"]
+          },
+          "Condition": {
+            r"$type": "string",
+            "?value": x["text"]
+          },
+          "High": {
+            r"$type": "number",
+            "?value": high.left,
+            "@unit": high.right
+          },
+          "Low": {
+            r"$type": "number",
+            "?value": low.left,
+            "@unit": low.right
+          }
+        });
+      }
+    }
+
+    SimpleNode mn = link["${node.path}/Forecast"];
+    for (var key in mn.children.keys.toList()) {
+      if (!names.contains(key)) {
+        link.removeNode("${mn.path}/${key}");
+      }
     }
   }
 }
@@ -169,7 +214,7 @@ class CreateTrackerNode extends SimpleNode {
       return {};
     }
 
-    var temperatureUnits = params["temperatureUnits"];
+    var units = params["units"];
     var city = params["city"];
     Map data = await queryWeather(buildQuery(city));
 
@@ -192,7 +237,7 @@ class CreateTrackerNode extends SimpleNode {
     link.addNode("/${id}", {
       r"$name": city,
       r"$city": city,
-      r"$temperature_units": temperatureUnits,
+      r"$units_type": units,
       "Condition": {
         r"$type": "string",
         "?value": "Unknown"
@@ -300,6 +345,38 @@ Future<Map<String, dynamic>> getWeatherInformation(cl) async {
     "units": info["channel"]["units"]
   };
 }
+
+Pair<num, String> convertToUnits(num input, String currentUnits, String target) {
+  if (input is! num) {
+    return new Pair(input, currentUnits);
+  }
+
+  var name = "${currentUnits}->${target}";
+  if (conversions.containsKey(name)) {
+    return conversions[name](input);
+  }
+  return new Pair(input, currentUnits);
+}
+
+class Pair<A, B> {
+  final A left;
+  final B right;
+
+  Pair(this.left, this.right);
+}
+
+typedef Pair<num, String> Conversion(num input);
+
+Map<String, Conversion> conversions = {
+  "°F->Metric": (num input) => new Pair((input - 32) * (5 / 9), "°C"),
+  "°C->Imperial": (num input) => new Pair((input * (9 / 5)) + 32, "°F"),
+  "mi->Metric": (num input) => new Pair(input / 0.62137, "km"),
+  "km->Imperial": (num input) => new Pair(input * 0.62137, "mi"),
+  "in->Metric": (num input) => new Pair(input * 2.54, "cm"),
+  "cm->Imperial": (num input) => new Pair(input / 2.54, "in"),
+  "mph->Metric": (num input) => new Pair(input * 1.609344, "kph"),
+  "kph->Imperial": (num input) => new Pair(input / 0.621371192, "mph")
+};
 
 const String urlBase = "https://query.yahooapis.com/v1/public/yql";
 
