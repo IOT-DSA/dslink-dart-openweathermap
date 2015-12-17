@@ -69,7 +69,12 @@ updateTrackers() async {
     SimpleNode l(String name) {
       return node.getChild(name);
     }
+
     l("Condition").updateValue(info["condition"]);
+
+    try {
+      l("Condition_Code").updateValue(info["condition-code"]);
+    } catch (e) {}
 
     var tempNode = l("Temperature");
     var windChillNode = l("Wind_Chill");
@@ -122,7 +127,7 @@ updateTrackers() async {
     var windSpeed = convertToUnits(gotWindSpeed, speedUnit, unitType);
     var pressure = convertToUnits(gotPressure, pressureUnit, unitType);
     var visibility = convertToUnits(gotVisibility, distanceUnit, unitType);
-    
+
     windSpeedNode.updateValue(windSpeed.left);
     windSpeedNode.configs["@unit"] = windSpeed.right;
     pressureNode.updateValue(pressure.left);
@@ -242,6 +247,11 @@ class CreateTrackerNode extends SimpleNode {
         r"$type": "string",
         "?value": "Unknown"
       },
+      "Condition_Code": {
+        r"$name": "Condition Code",
+        r"$type": "number",
+        "?value": null
+      },
       "Temperature": {
         r"$type": "number",
         "?value": null
@@ -332,6 +342,7 @@ Future<Map<String, dynamic>> getWeatherInformation(cl) async {
 
   return {
     "condition": c["text"],
+    "condition-code": c["code"],
     "temperature": c["temp"],
     "sunrise": astronomy["sunrise"],
     "sunset": astronomy["sunset"],
