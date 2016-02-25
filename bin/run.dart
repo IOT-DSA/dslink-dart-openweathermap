@@ -140,7 +140,6 @@ updateTrackers() async {
       l("Sunrise").updateValue(info["sunrise"]);
       l("Sunset").updateValue(info["sunset"]);
     } catch (e) {}
-    SimpleNode forecast = node.getChild("Forecast");
     var fi = info["forecast"];
 
     var names = [];
@@ -164,19 +163,38 @@ updateTrackers() async {
       var high = convertToUnits(gotHigh, useTemperatureUnits, unitType);
       var low = convertToUnits(gotLow, useTemperatureUnits, unitType);
       var p = "${node.path}/Forecast/${dayName}";
-      var exists = (link.provider as SimpleNodeProvider).nodes.containsKey(p);
+      var exists = (link.provider as SimpleNodeProvider).getNode(p) != null;
 
       if (exists) {
         var dateNode = link["${p}/Date"];
         var conditionNode = link["${p}/Condition"];
+        var conditionCodeNode = link["${p}/Condition_Code"];
         var highNode = link["${p}/High"];
         var lowNode = link["${p}/Low"];
-        dateNode.updateValue(x["date"]);
-        conditionNode.updateValue(x["text"]);
-        highNode.updateValue(high.left);
-        lowNode.updateValue(low.left);
-        highNode.configs[r"@unit"] = high.right;
-        lowNode.configs[r"@unit"] = low.right;
+
+        if (dateNode != null) {
+          dateNode.updateValue(x["date"]);
+        }
+
+        if (conditionCodeNode != null) {
+          conditionCodeNode.updateValue(x["code"]);
+        }
+
+        if (conditionNode != null) {
+          conditionNode.updateValue(x["text"]);
+        }
+
+        if (lowNode != null) {
+          lowNode.updateValue(low.left);
+        }
+
+        if (highNode != null) {
+          highNode.configs[r"@unit"] = high.right;
+        }
+
+        if (lowNode != null) {
+          lowNode.configs[r"@unit"] = low.right;
+        }
       } else {
         link.addNode("${node.path}/Forecast/${dayName}", {
           "Date": {
@@ -186,6 +204,11 @@ updateTrackers() async {
           "Condition": {
             r"$type": "string",
             "?value": x["text"]
+          },
+          "Condition_Code": {
+            r"$name": "Condition Code",
+            r"$type": "number",
+            "?value": -1
           },
           "High": {
             r"$type": "number",
@@ -333,7 +356,6 @@ Future<Map<String, dynamic>> getWeatherInformation(cl) async {
   if (info == null) {
     return null;
   }
-
 
   var c = info["channel"]["item"]["condition"];
   var wind = info["channel"]["wind"];
