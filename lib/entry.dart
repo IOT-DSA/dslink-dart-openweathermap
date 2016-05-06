@@ -5,6 +5,8 @@ import "dart:convert";
 
 import "package:dslink/client.dart";
 import "package:dslink/responder.dart";
+import "package:dslink/nodes.dart";
+
 import "package:http/http.dart" as http;
 
 http.Client client = new http.Client();
@@ -147,8 +149,9 @@ updateTrackers() async {
     var names = [];
 
     for (var x in fi) {
-      var dayName = x["day"];
-      names.add(dayName);
+      var dayName = x["day"].toString();
+      var dateName = x["date"].toString();
+      names.add(dateName);
       var gotHigh = x["high"];
       var gotLow = x["low"];
 
@@ -164,7 +167,7 @@ updateTrackers() async {
 
       var high = convertToUnits(gotHigh, useTemperatureUnits, unitType);
       var low = convertToUnits(gotLow, useTemperatureUnits, unitType);
-      var p = "${node.path}/Forecast/${dayName}";
+      var p = "${node.path}/Forecast/${NodeNamer.createName(dateName)}";
       var exists = (link.provider as SimpleNodeProvider).getNode(p) != null;
 
       if (exists) {
@@ -173,6 +176,7 @@ updateTrackers() async {
         var conditionCodeNode = link["${p}/Condition_Code"];
         var highNode = link["${p}/High"];
         var lowNode = link["${p}/Low"];
+        var dayNode = link["${p}/Day"];
 
         if (dateNode != null) {
           dateNode.updateValue(x["date"]);
@@ -197,8 +201,16 @@ updateTrackers() async {
         if (lowNode != null) {
           lowNode.configs[r"@unit"] = low.right;
         }
+
+        if (dayNode != null) {
+          dayNode.updateValue(dayName);
+        }
       } else {
-        link.addNode("${node.path}/Forecast/${dayName}", {
+        link.addNode(p, {
+          "Day": {
+            r"$type": "string",
+            "?value": x["day"]
+          },
           "Date": {
             r"$type": "string",
             "?value": x["date"]
@@ -228,7 +240,9 @@ updateTrackers() async {
 
     SimpleNode mn = link["${node.path}/Forecast"];
     for (var key in mn.children.keys.toList()) {
-      if (!names.contains(key)) {
+      var name = NodeNamer.decodeName(key);
+
+      if (!names.contains(name)) {
         link.removeNode("${mn.path}/${key}");
       }
     }
@@ -416,14 +430,16 @@ Map<String, Conversion> conversions = {
 const String urlBase = "https://query.yahooapis.com/v1/public/yql";
 
 String buildQuery(String city) {
-  return 'select * from weather.forecast where woeid in (select woeid from geo.places(1) where text="${city}")';
+  return 'select * from weather.forecast where woeid in ' +
+    '(select woeid from geo.places(1) where text="${city}")';
 }
 
 Future<Map<String, dynamic>> queryWeather(String yql) async {
   try {
     yql = Uri.encodeComponent(yql);
 
-    var url = "${urlBase}?q=${yql}&format=json&env=${Uri.encodeComponent("store://datatables.org/alltableswithkeys")}";
+    var url = "${urlBase}?q=${yql}&format=json&env=";
+    url += Uri.encodeComponent("store://datatables.org/alltableswithkeys");
 
     http.Response response = await client.get(url);
 
