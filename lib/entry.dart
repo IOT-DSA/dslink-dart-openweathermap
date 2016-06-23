@@ -6,6 +6,7 @@ import "dart:convert";
 import "package:dslink/client.dart";
 import "package:dslink/responder.dart";
 import "package:dslink/nodes.dart";
+import "package:dslink/utils.dart";
 
 import "package:http/http.dart" as http;
 
@@ -38,7 +39,7 @@ main(List<String> args) async {
     ]
   });
 
-  new Timer.periodic(weatherTickRate, (timer) async {
+  Scheduler.safeEvery(weatherTickRate, () async {
     await updateTrackers();
   });
 
@@ -47,7 +48,7 @@ main(List<String> args) async {
   link.connect();
 }
 
-Duration weatherTickRate = new Duration(seconds: 10);
+Duration weatherTickRate = new Duration(minutes: 15);
 
 SimpleNode rootNode;
 
@@ -168,7 +169,7 @@ updateTrackers() async {
       var high = convertToUnits(gotHigh, useTemperatureUnits, unitType);
       var low = convertToUnits(gotLow, useTemperatureUnits, unitType);
       var p = "${node.path}/Forecast/${NodeNamer.createName(dateName)}";
-      var exists = (link.provider as SimpleNodeProvider).getNode(p) != null;
+      var exists = (link.provider as SimpleNodeProvider).hasNode(p);
 
       if (exists) {
         var dateNode = link["${p}/Date"];
