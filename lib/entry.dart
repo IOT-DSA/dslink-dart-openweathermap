@@ -2,19 +2,22 @@ library dslink.weather.entry_point;
 
 import "dart:async";
 import "dart:convert";
+import "dart:io";
 
 import "package:dslink/client.dart";
 import "package:dslink/responder.dart";
 import "package:dslink/nodes.dart";
 import "package:dslink/utils.dart";
 
-import "package:http/http.dart" as http;
-
-http.Client client = new http.Client();
+HttpClient httpClient;
 
 LinkProvider link;
 
 main(List<String> args) async {
+  httpClient = new HttpClient();
+  httpClient.badCertificateCallback = (a, b, c) => true;
+  httpClient.maxConnectionsPerHost = 4;
+
   link = new LinkProvider(args, "Weather-", command: "run", profiles: {
     "createTracker": (String path) => new CreateTrackerNode(path),
     "deleteTracker": (String path) => new DeleteTrackerNode(path)
@@ -22,7 +25,7 @@ main(List<String> args) async {
 
   rootNode = link["/"];
 
-  link.addNode("/Create_Tracker", {
+  SimpleNode createTrackerNode = link.addNode("/Create_Tracker", {
     r"$is": "createTracker",
     r"$invokable": "write",
     r"$result": "values",
@@ -38,6 +41,7 @@ main(List<String> args) async {
       }
     ]
   });
+  createTrackerNode.serializable = false;
 
   Scheduler.safeEvery(weatherTickRate, () async {
     await updateTrackers();
@@ -61,7 +65,10 @@ updateTrackers() async {
     var unitType = node.configs[r"$units_type"];
     if (unitType == null) {
       if (node.configs.containsKey(r"$temperature_units")) {
-        unitType = node.configs[r"$temperature_units"] == "Fahrenheit" ? "Imperial" : "Metric";
+        unitType =
+          node.configs[r"$temperature_units"] == "Fahrenheit"
+            ? "Imperial"
+            : "Metric";
       } else {
         unitType = "Imperial";
       }
@@ -442,9 +449,13 @@ Future<Map<String, dynamic>> queryWeather(String yql) async {
     var url = "${urlBase}?q=${yql}&format=json&env=";
     url += Uri.encodeComponent("store://datatables.org/alltableswithkeys");
 
-    http.Response response = await client.get(url);
-
-    var json = JSON.decode(response.body);
+    var request = await httpClient.getUrl(Uri.parse(url));
+    var response = await request.close();
+    var json = JSON.decode(
+      await response.transform(
+        const Utf8Decoder()
+      ).join()
+    );
 
     return json["query"]["results"];
   } catch (e) {
