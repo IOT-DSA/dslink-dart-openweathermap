@@ -1,7 +1,7 @@
 {
-  "name": "dslink-dart-weather",
+  "name": "dslink-dart-openweathermap",
   "version": "1.0.0",
-  "description": "Weather DSLink",
+  "description": "Open Weather Map DSLink",
   "main": "bin/run.dart",
   "engines": {
     "dart": ">=1.9.0"

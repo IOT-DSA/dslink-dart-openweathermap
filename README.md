@@ -19,4 +19,9 @@ To create a tracker, use the `Create Tracker` action on the link. To delete a tr
 
 ## Internals
 
-This DSLink uses the [Yahoo Weather API](https://developer.yahoo.com/weather/).
+This DSLink uses the [openweathermap API](https://openweathermap.org).
+
+You will need to [register for an appId](https://home.agromonitoring.com/users/sign_up) before using this dslink 
+
+If you find the city created is not at the same location as you expected, 
+you can [search city here](https://openweathermap.org/find) and then create tracker with city code instead of city name.
