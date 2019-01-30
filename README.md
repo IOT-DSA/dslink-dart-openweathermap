@@ -1,6 +1,7 @@
 # Weather DSLink
 
 A DSLink for Weather Information.
+Based on [openweathermap API](https://openweathermap.org).
 
 ## Concepts
 
@@ -10,18 +11,11 @@ A tracker is simply a node that has a city name attached. It contains informatio
 
 ## Usage
 
-```bash
-pub get
-dart bin/run.dart
-```
-
 To create a tracker, use the `Create Tracker` action on the link. To delete a tracker, use the `Delete Tracker` action on the tracker node.
-
-## Internals
-
-This DSLink uses the [openweathermap API](https://openweathermap.org).
-
+#### Add App ID
 You will need to [register for an appId](https://home.agromonitoring.com/users/sign_up) before using this dslink 
 
-If you find the city created is not at the same location as you expected, 
-you can [search city here](https://openweathermap.org/find) and then create tracker with city code instead of city name.
+#### Create Tracker
+
+* To help the dslink find the city, please add 2 characters county code after city name, i.e. : `Oakland,US`
+* You can also use the coordinates of the city instead of city name, i.e. : `37.3382,-121.8863`

@@ -32,7 +32,8 @@ main(List<String> args) async {
       profiles: {
         "createTracker": (String path) => new CreateTrackerNode(path),
         "setAppId": (String path) => new SetAppIdNode(path),
-        "forecast": (String path) => new ForecastNode(path),
+        "forecast5": (String path) => new Forecast5Node(path),
+        "forecast16": (String path) => new Forecast16Node(path),
         "deleteTracker": (String path) => new DeleteTrackerNode(path)
       },
       encodePrettyJson: true);
@@ -46,7 +47,12 @@ main(List<String> args) async {
     r"$name": "Create Tracker",
     r"$params": [
       {"name": "city", "type": "string"},
-      {"name": "units", "type": "enum[imperial,metric]"}
+      {"name": "units", "type": "enum[imperial,metric]", "default":"imperial"},
+      {
+        "name": "forecast",
+        "type": "enum[5days,16days,none]",
+        "default": "5days"
+      }
     ]
   });
   createTrackerNode.serializable = false;
@@ -89,193 +95,6 @@ Duration weatherTickRate = new Duration(minutes: 15);
 
 SimpleNode rootNode;
 
-updateTrackers__() async {
-  for (SimpleNode node in rootNode.children.values) {
-    await updateTracker__(node);
-  }
-}
-
-updateTracker__(SimpleNode node) async {
-  if (node.getConfig(r"$invokable") != null) {
-    return;
-  }
-
-  var unitType = node.configs[r"$units_type"];
-  if (unitType == null) {
-    if (node.configs.containsKey(r"$temperature_units")) {
-      unitType = node.configs[r"$temperature_units"] == "Fahrenheit"
-          ? "imperial"
-          : "metric";
-    } else {
-      unitType = "imperial";
-    }
-  }
-  var city = node.getConfig(r"$city");
-  var info = await getWeatherInformation__(city);
-  if (info == null) {
-    return;
-  }
-  SimpleNode l(String name) {
-    return node.getChild(name);
-  }
-
-  l("Condition").updateValue(info["condition"]);
-
-  try {
-    l("Condition_Code").updateValue(info["condition-code"]);
-  } catch (e) {}
-
-  var tempNode = l("Temperature");
-  var windChillNode = l("Wind_Chill");
-
-  var gotTemperatureUnits = info["units"]["temperature"];
-  var gotTemperature = info["temperature"];
-  var gotWindChill = info["wind chill"];
-
-  try {
-    if (gotTemperature is String) {
-      gotTemperature = num.parse(gotTemperature);
-    }
-
-    if (gotWindChill is String) {
-      gotWindChill = num.parse(gotWindChill);
-    }
-  } catch (e) {}
-
-  var useTemperatureUnits = "°${gotTemperatureUnits}";
-
-  var temp = convertToUnits(gotTemperature, useTemperatureUnits, unitType);
-  var windChill = convertToUnits(gotWindChill, useTemperatureUnits, unitType);
-
-  tempNode.updateValue(temp.left);
-  windChillNode.updateValue(windChill.left);
-  tempNode.attributes["@unit"] = temp.right;
-  windChillNode.attributes["@unit"] = windChill.right;
-
-  var windSpeedNode = l("Wind_Speed");
-  var visibilityNode = l("Visibility");
-  var pressureNode = l("Pressure");
-  var humidityNode = l("Humidity");
-
-  humidityNode.updateValue(info["humidity"]);
-
-  var gotWindSpeed = info["wind speed"];
-  var gotVisibility = info["visibility"];
-  var gotPressure = info["pressure"];
-
-  try {
-    gotWindSpeed = num.parse(gotWindSpeed);
-    gotVisibility = num.parse(gotVisibility);
-    gotPressure = num.parse(gotPressure);
-  } catch (e) {}
-
-  var speedUnit = info["units"]["speed"];
-  var pressureUnit = info["units"]["pressure"];
-  var distanceUnit = info["units"]["distance"];
-
-  var windSpeed = convertToUnits(gotWindSpeed, speedUnit, unitType);
-  var pressure = convertToUnits(gotPressure, pressureUnit, unitType);
-  var visibility = convertToUnits(gotVisibility, distanceUnit, unitType);
-
-  windSpeedNode.updateValue(windSpeed.left);
-  windSpeedNode.configs["@unit"] = windSpeed.right;
-  pressureNode.updateValue(pressure.left);
-  pressureNode.configs["@unit"] = pressure.right;
-  visibilityNode.updateValue(visibility.left);
-  visibilityNode.configs["@unit"] = visibility.right;
-
-  l("Wind_Direction").updateValue(info["wind direction"]);
-  try {
-    l("Sunrise").updateValue(info["sunrise"]);
-    l("Sunset").updateValue(info["sunset"]);
-  } catch (e) {}
-  var fi = info["forecast"];
-
-  var names = [];
-
-  for (var x in fi) {
-    var dayName = x["day"].toString();
-    var dateName = x["date"].toString();
-    names.add(dateName);
-    var gotHigh = x["high"];
-    var gotLow = x["low"];
-
-    try {
-      if (gotHigh is String) {
-        gotHigh = num.parse(gotHigh);
-      }
-
-      if (gotLow is String) {
-        gotLow = num.parse(gotLow);
-      }
-    } catch (e) {}
-
-    var high = convertToUnits(gotHigh, useTemperatureUnits, unitType);
-    var low = convertToUnits(gotLow, useTemperatureUnits, unitType);
-    var p = "${node.path}/Forecast/${NodeNamer.createName(dateName)}";
-    var exists = (link.provider as SimpleNodeProvider).hasNode(p);
-
-    if (exists) {
-      var dateNode = link["${p}/Date"];
-      var conditionNode = link["${p}/Condition"];
-      var conditionCodeNode = link["${p}/Condition_Code"];
-      var highNode = link["${p}/High"];
-      var lowNode = link["${p}/Low"];
-      var dayNode = link["${p}/Day"];
-
-      if (dateNode != null) {
-        dateNode.updateValue(x["date"]);
-      }
-
-      if (conditionCodeNode != null) {
-        conditionCodeNode.updateValue(x["code"]);
-      }
-
-      if (conditionNode != null) {
-        conditionNode.updateValue(x["text"]);
-      }
-
-      if (lowNode != null) {
-        lowNode.updateValue(low.left);
-      }
-
-      if (highNode != null) {
-        highNode.configs[r"@unit"] = high.right;
-      }
-
-      if (lowNode != null) {
-        lowNode.configs[r"@unit"] = low.right;
-      }
-
-      if (dayNode != null) {
-        dayNode.updateValue(dayName);
-      }
-    } else {
-      link.addNode(p, {
-        "Day": {r"$type": "string", "?value": x["day"]},
-        "Date": {r"$type": "string", "?value": x["date"]},
-        "Condition": {r"$type": "string", "?value": x["text"]},
-        "Condition_Code": {
-          r"$name": "Condition Code",
-          r"$type": "number",
-          "?value": -1
-        },
-        "High": {r"$type": "number", "?value": high.left, "@unit": high.right},
-        "Low": {r"$type": "number", "?value": low.left, "@unit": low.right}
-      });
-    }
-  }
-
-  SimpleNode mn = link["${node.path}/Forecast"];
-  for (var key in mn.children.keys.toList()) {
-    var name = NodeNamer.decodeName(key);
-
-    if (!names.contains(name)) {
-      link.removeNode("${mn.path}/${key}");
-    }
-  }
-}
-
 class SetAppIdNode extends SimpleNode {
   SetAppIdNode(String path) : super(path);
 
@@ -311,13 +130,16 @@ class CreateTrackerNode extends SimpleNode {
     if (params["city"] == null || params["units"] == null || appid == null) {
       return {};
     }
-
+    var forecast = params["forecast"];
     var units = params["units"];
     var city = params["city"];
     Map data = await queryCity(city, units);
 
-    if (data == null) {
+    if (data == null || !data.containsKey('name') || !data.containsKey('id')) {
       return {};
+    }
+    if (forecast != '16days' && forecast != '5days') {
+      forecast = 'none';
     }
 
     var id = "${data['name']}-${data['id']}";
@@ -326,15 +148,16 @@ class CreateTrackerNode extends SimpleNode {
       link.removeNode("/${id}");
     }
     var isMetric = units != 'imperial';
-
-    var node = link.addNode("/${id}", {
+    var nodeData = {
+      r"$cityId": data['id'],
       r"$name": data['name'],
       r"$city": data['name'],
+      r"$country": data['sys']['country'],
       r"$units_type": units,
       "Condition": {r"$type": "string"},
-      "Condition_Code": {
-        r"$name": "Condition Code",
-        r"$type": "number",
+      "Condition_Codes": {
+        r"$name": "Condition Codes",
+        r"$type": "string",
       },
       "Description": {
         r"$type": "string",
@@ -343,7 +166,6 @@ class CreateTrackerNode extends SimpleNode {
         r"$type": "string",
       },
       "Temperature": {r"$type": "number", "@unit": isMetric ? "°C" : "°F"},
-
       "Wind_Speed": {
         r"$name": "Wind Speed",
         r"$type": "number",
@@ -352,15 +174,11 @@ class CreateTrackerNode extends SimpleNode {
       "Wind_Direction": {r"$name": "Wind Direction", r"$type": "number"},
       "Humidity": {r"$type": "number"},
       "Pressure": {r"$type": "number", "@unit": "hPa"},
-      "Visibility": {r"$type": "number", "@unit": "m"},
+      "Visibility": {r"$type": "number", "@unit": isMetric ? "km" : "mi"},
       "Sunrise": {r"$type": "string"},
       "Sunset": {r"$type": "string"},
-      "Forecast": {
-        r"$is": "forecast",
-        r"$invokable": "read",
-        r"$result": "table",
-        r"$name": "Forecast"
-      },
+      "Lat": {r"$type": "number", "?value": data['coord']['lat']},
+      "Lon": {r"$type": "number", "?value": data['coord']['lon']},
       "Delete_Tracker": {
         r"$is": "deleteTracker",
         r"$invokable": "write",
@@ -368,13 +186,36 @@ class CreateTrackerNode extends SimpleNode {
         r"$params": {},
         r"$name": "Delete Tracker"
       }
-    });
+    };
+    if (forecast != 'none') {
+      nodeData['Forecast5'] = {
+        r"$is": "forecast5",
+        r"$invokable": "read",
+        r"$result": "table",
+        r"$name": "Forecast 5 Days",
+        r"$params": [
+          {"name": "Interval", "type": "enum[3hour,daily]"}
+        ]
+      };
+      if (forecast == '16days') {
+        nodeData['Forecast16'] = {
+          r"$is": "forecast16",
+          r"$invokable": "read",
+          r"$result": "table",
+          r"$name": "Forecast 16 Days"
+        };
+      }
+    }
+    var node = link.addNode("/${id}", nodeData);
 
     updateCurrent(node, data);
-    loadForecast(node);
-
+    loadForecast5(node.getChild('Forecast5'));
+    loadForecast16(node.getChild('Forecast16'));
     link.save();
 
+    addTask(node);
+    addTask(node.getChild('Forecast5'));
+    addTask(node.getChild('Forecast16'));
     return {};
   }
 }
@@ -391,40 +232,23 @@ class DeleteTrackerNode extends SimpleNode {
   }
 }
 
-void initTasks() {}
+void initTasks() {
+  rootNode.children.forEach((key, node) {
+    if (node is SimpleNode && node.configs.containsKey(r'$cityId')){
+      addTask(node);
+      addTask(node.getChild('Forecast5'));
+      addTask(node.getChild('Forecast16'));
+    }
+  });
 
-Future<Map<String, dynamic>> getWeatherInformation__(cl) async {
-  Map info;
-  if (cl is Map) {
-    info = cl;
-  } else {
-    info = await queryWeather(buildQuery(cl));
+  // add dummy node to expand the task queue, so
+  var dummyNode = new SimpleNode('dummy node remove later');
+  dummyNode.removed = true;
+  var target_size = tasks.length* 10;
+  while(tasks.length < target_size) {
+    addTask(dummyNode);
   }
-
-  if (info == null) {
-    return null;
-  }
-
-  var c = info["channel"]["item"]["condition"];
-  var wind = info["channel"]["wind"];
-  var astronomy = info["channel"]["astronomy"];
-  var at = info["channel"]["atmosphere"];
-
-  return {
-    "condition": c["text"],
-    "condition-code": c["code"],
-    "temperature": c["temp"],
-    "sunrise": astronomy["sunrise"],
-    "sunset": astronomy["sunset"],
-    "wind speed": wind["speed"],
-    "wind chill": wind["chill"],
-    "wind direction": wind["direction"],
-    "humidity": at["humidity"],
-    "pressure": at["pressure"],
-    "visibility": at["visibility"],
-    "forecast": info["channel"]["item"]["forecast"],
-    "units": info["channel"]["units"]
-  };
+  runTask();
 }
 
 Pair<num, String> convertToUnits(
