@@ -19,7 +19,10 @@ HttpClient httpClient;
 LinkProvider link;
 
 String appid;
+
+// how many requests per minute
 num maxCapacity = 60;
+// requests already used in previous minute
 num usedCapacity = 0;
 
 main(List<String> args) async {
@@ -47,7 +50,7 @@ main(List<String> args) async {
     r"$name": "Create Tracker",
     r"$params": [
       {"name": "city", "type": "string"},
-      {"name": "units", "type": "enum[imperial,metric]", "default":"imperial"},
+      {"name": "units", "type": "enum[imperial,metric]", "default": "imperial"},
       {
         "name": "forecast",
         "type": "enum[5days,16days,none]",
@@ -90,8 +93,6 @@ main(List<String> args) async {
 
   initTasks();
 }
-
-Duration weatherTickRate = new Duration(minutes: 15);
 
 SimpleNode rootNode;
 
@@ -234,52 +235,23 @@ class DeleteTrackerNode extends SimpleNode {
 
 void initTasks() {
   rootNode.children.forEach((key, node) {
-    if (node is SimpleNode && node.configs.containsKey(r'$cityId')){
+    if (node is SimpleNode && node.configs.containsKey(r'$cityId')) {
       addTask(node);
       addTask(node.getChild('Forecast5'));
       addTask(node.getChild('Forecast16'));
     }
   });
 
-  // add dummy node to expand the task queue, so
+  // add dummy node to expand the task queue, so the initial loading can handler more data
   var dummyNode = new SimpleNode('dummy node remove later');
   dummyNode.removed = true;
-  var target_size = tasks.length* 10;
-  while(tasks.length < target_size) {
+  var target_size = tasks.length * 10;
+  if (target_size > maxCapacity * 5) {
+    // use no more than half of maxCapacity on the first run
+    target_size = maxCapacity * 5;
+  }
+  while (tasks.length < target_size) {
     addTask(dummyNode);
   }
   runTask();
 }
-
-Pair<num, String> convertToUnits(
-    num input, String currentUnits, String target) {
-  if (input is! num) {
-    return new Pair(input, currentUnits);
-  }
-
-  var name = "${currentUnits}->${target}";
-  if (conversions.containsKey(name)) {
-    return conversions[name](input);
-  }
-  return new Pair(input, currentUnits);
-}
-
-class Pair<A, B> {
-  final A left;
-  final B right;
-
-  Pair(this.left, this.right);
-}
-
-typedef Pair<num, String> Conversion(num input);
-
-Map<String, Conversion> conversions = {
-  "°F->metric": (num input) => new Pair((input - 32) * (5 / 9), "°C"),
-  "°C->imperial": (num input) => new Pair((input * (9 / 5)) + 32, "°F"),
-  "mi->metric": (num input) => new Pair(input / 0.62137, "km"),
-  "km->imperial": (num input) => new Pair(input * 0.62137, "mi"),
-  "in->metric": (num input) => new Pair(input * 2.54, "cm"),
-  "cm->imperial": (num input) => new Pair(input / 2.54, "in"),
-  "mph->metric": (num input) => new Pair(input * 1.609344, "kph"),
-  "kph->imperial": (num input) => new Pair(input / 0.621371192, "mph")
-};
