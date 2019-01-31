@@ -18,4 +18,5 @@ You will need to [register for an appId](https://home.agromonitoring.com/users/s
 #### Create Tracker
 
 * To help the dslink find the city, please add 2 characters county code after city name, i.e. : `Oakland,US`
-* You can also use the coordinates of the city instead of city name, i.e. : `37.3382,-121.8863`
+* You can also use the lat,long coordinates of the city instead of city name, i.e. : `37.3382,-121.8863`
+  * you can find the lat long of your city at [latlong.net](https://www.latlong.net)
