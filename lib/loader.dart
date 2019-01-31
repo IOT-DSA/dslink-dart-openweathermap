@@ -146,10 +146,11 @@ loadForecast16(Forecast16Node node) async {
   if (node == null) {
     return;
   }
-  var query = buildQuery(node.parent, node, 'daily');
+  var query = buildQuery(node.parent, node, 'forecast/daily');
   if (query == null) {
     return;
   }
+  query = '${query}&cnt=16';
   var data = await queryWeather(query);
   node.setCache(data);
 }

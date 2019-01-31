@@ -34,8 +34,8 @@ class Forecast16Node extends SimpleNode {
           codes.join(','),
           weather['description'],
           buildIconUrl(weather['icon']),
-          d['temp']['temp_max'],
-          d['temp']['temp_min'],
+          d['temp']['max'],
+          d['temp']['min'],
           d['humidity'],
         ]);
       }
