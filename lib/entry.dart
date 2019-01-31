@@ -9,6 +9,7 @@ import "package:dslink/client.dart";
 import "package:dslink/responder.dart";
 import "package:dslink/nodes.dart";
 import "package:dslink/utils.dart";
+import "package:dslink/common.dart";
 
 part "./forecast.dart";
 
@@ -106,7 +107,7 @@ class SetAppIdNode extends SimpleNode {
     if (params["AppId"] == null ||
         params["AppId"] is! String ||
         params["AppId"].length < 32) {
-      return {};
+      return new DSError("invalidParameter", msg: "invalid AppId");
     }
     appid = params["AppId"];
     this.parent.configs[r"$$appid"] = appid;
@@ -130,8 +131,11 @@ class CreateTrackerNode extends SimpleNode {
 
   @override
   Object onInvoke(Map<String, dynamic> params) async {
-    if (params["city"] == null || params["units"] == null || appid == null) {
-      return {};
+    if (appid == null) {
+      return new DSError("failed", msg: "AppId not set");
+    }
+    if (params["city"] == null || params["units"] == null) {
+      return DSError.INVALID_PARAMETER;
     }
     var forecast = params["forecast"];
     var units = params["units"];
@@ -139,7 +143,7 @@ class CreateTrackerNode extends SimpleNode {
     Map data = await queryCity(city, units);
 
     if (data == null || !data.containsKey('name') || !data.containsKey('id')) {
-      return {};
+      return new DSError("failed", msg: "City not found");
     }
     if (forecast != '16days' && forecast != '5days') {
       forecast = 'none';
