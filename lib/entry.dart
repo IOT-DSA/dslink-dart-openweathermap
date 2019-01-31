@@ -154,6 +154,8 @@ class CreateTrackerNode extends SimpleNode {
       r"$name": data['name'],
       r"$city": data['name'],
       r"$country": data['sys']['country'],
+      r"$lat": data['coord']['lat'],
+      r"$lon": data['coord']['lon'],
       r"$units_type": units,
       "Condition": {r"$type": "string"},
       "Condition_Codes": {
@@ -178,8 +180,6 @@ class CreateTrackerNode extends SimpleNode {
       "Visibility": {r"$type": "number", "@unit": isMetric ? "km" : "mi"},
       "Sunrise": {r"$type": "string"},
       "Sunset": {r"$type": "string"},
-      "Lat": {r"$type": "number", "?value": data['coord']['lat']},
-      "Lon": {r"$type": "number", "?value": data['coord']['lon']},
       "Delete_Tracker": {
         r"$is": "deleteTracker",
         r"$invokable": "write",
@@ -234,11 +234,18 @@ class DeleteTrackerNode extends SimpleNode {
 }
 
 void initTasks() {
+  void restartTask(SimpleNode node) {
+    if (node != null) {
+      node.configs.remove(r'$updateTime');
+      addTask(node);
+    }
+  }
+
   rootNode.children.forEach((key, node) {
     if (node is SimpleNode && node.configs.containsKey(r'$cityId')) {
-      addTask(node);
-      addTask(node.getChild('Forecast5'));
-      addTask(node.getChild('Forecast16'));
+      restartTask(node);
+      restartTask(node.getChild('Forecast5'));
+      restartTask(node.getChild('Forecast16'));
     }
   });
 

@@ -77,11 +77,11 @@ loadCurrent(SimpleNode node) async {
   if (cityId is! num) {
     return;
   }
-  var unit = node.configs[r'$units'];
-  if (unit != 'imperial') {
-    unit = 'metric';
+
+  var query = buildQuery(node, node, 'weather');
+  if (query == null) {
+    return;
   }
-  var query = buildQuery(node, 'weather');
   var data = await queryWeather(query);
   updateCurrent(node, data);
 }
@@ -94,7 +94,7 @@ updateCurrent(SimpleNode node, Map<String, dynamic> data) {
     return node.getChild(name);
   }
 
-  var unit = node.configs[r'$units'];
+  var unit = node.configs[r'$units_type'];
   if (data['visibility'] != null) {
     if (unit != 'imperial') {
       c('Visibility').updateValue(data['visibility'] * 0.001);
@@ -134,7 +134,10 @@ loadForecast5(Forecast5Node node) async {
     return;
   }
 
-  var query = buildQuery(node.parent, 'forecast');
+  var query = buildQuery(node.parent, node, 'forecast');
+  if (query == null) {
+    return;
+  }
   var data = await queryWeather(query);
   node.setCache(data);
 }
@@ -143,22 +146,41 @@ loadForecast16(Forecast16Node node) async {
   if (node == null) {
     return;
   }
-  var query = buildQuery(node.parent, 'daily');
+  var query = buildQuery(node.parent, node, 'daily');
+  if (query == null) {
+    return;
+  }
   var data = await queryWeather(query);
   node.setCache(data);
 }
 
 const String urlBase = "https://api.openweathermap.org/data/2.5/";
 
-buildQuery(SimpleNode node, String api) {
-  var cityId = node.configs[r'$cityId'];
+buildQuery(SimpleNode cityNode, SimpleNode cacheNode, String api) {
+  var cityId = cityNode.configs[r'$cityId'];
   if (cityId is! num) {
     return null;
   }
-  var unit = node.configs[r'$units'];
+  var unit = cityNode.configs[r'$units_type'];
   if (unit != 'imperial') {
     unit = 'metric';
   }
+  var now = new DateTime.now();
+  try {
+    var ts = cacheNode.configs[r'$updateTime'];
+    if (ts is String) {
+      var lastUpdateTime = DateTime.parse(ts);
+      if (now.difference(lastUpdateTime) < const Duration(minutes: 15)) {
+        // update no more than once every 15 minutes
+        return null;
+      }
+    }
+  } catch (e, stack) {
+    logger.warning(e);
+    logger.warning(stack);
+  }
+  cacheNode.configs[r'$updateTime'] = now.toUtc().toIso8601String();
+  cacheNode.updateList(r'$updateTime');
   return '${urlBase}${api}?id=${cityId}&appid=${appid}&units=${unit}';
 }
 
