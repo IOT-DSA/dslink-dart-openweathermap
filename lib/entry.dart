@@ -14,6 +14,8 @@ part "./forecast.dart";
 
 part "./loader.dart";
 
+part "./algorithm.dart";
+
 HttpClient httpClient;
 
 LinkProvider link;
@@ -195,7 +197,7 @@ class CreateTrackerNode extends SimpleNode {
         r"$result": "table",
         r"$name": "Forecast 5 Days",
         r"$params": [
-          {"name": "Interval", "type": "enum[3hour,daily]"}
+          {"name": "Interval", "type": "enum[3hours,daily]"}
         ]
       };
       if (forecast == '16days') {

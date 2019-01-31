@@ -7,7 +7,7 @@ Based on [openweathermap API](https://openweathermap.org).
 
 ### Trackers
 
-A tracker is simply a node that has a city name attached. It contains information about the current conditions, as well as a weekly forecast.
+A tracker is simply a node that has a city name attached. It contains information about the current conditions.
 
 ## Usage
 
