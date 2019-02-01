@@ -126,6 +126,7 @@ mergeWeather(num lon, List<Map<String, dynamic>> data, List output) {
         }
         if (p > priority) {
           mainWeather = weather;
+          priority = p;
         }
         humiditySum += d['main']['humidity'];
         var tmax = d['main']['temp_max'];
