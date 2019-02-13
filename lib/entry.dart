@@ -69,8 +69,8 @@ main(List<String> args) async {
     r"$result": "values",
     r"$name": "Set AppId",
     r"$params": [
-      {"name": "AppId", "type": "string"},
-      {"name": "Requests per Minute", "type": "number", "default": 50}
+      {"name": "appid", "type": "string"},
+      {"name": "requests per minute", "type": "number", "default": 50}
     ]
   });
   setAppidNode.serializable = false;
@@ -104,17 +104,17 @@ class SetAppIdNode extends SimpleNode {
 
   @override
   Object onInvoke(Map<String, dynamic> params) async {
-    if (params["AppId"] == null ||
-        params["AppId"] is! String ||
-        params["AppId"].length < 32) {
+    if (params["appid"] == null ||
+        params["appid"] is! String ||
+        params["appid"].length < 32) {
       return new DSError("invalidParameter", msg: "invalid AppId");
     }
-    appid = params["AppId"];
+    appid = params["appid"];
     this.parent.configs[r"$$appid"] = appid;
     this.parent.updateList(r"$$appid");
 
-    if (params['Requests per Minute'] is num &&
-        params['Requests per Minute'] > 0) {
+    if (params["requests per minute"] is num &&
+        params["requests per minute"] > 0) {
       maxCapacity = params['Request per Minute'];
     } else {
       maxCapacity = 60;
