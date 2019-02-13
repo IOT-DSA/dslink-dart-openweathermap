@@ -70,7 +70,7 @@ main(List<String> args) async {
     r"$name": "Set AppId",
     r"$params": [
       {"name": "AppId", "type": "string"},
-      {"name": "Request per Minutes", "type": "number", "default": 50}
+      {"name": "Requests per Minute", "type": "number", "default": 50}
     ]
   });
   setAppidNode.serializable = false;
@@ -113,9 +113,9 @@ class SetAppIdNode extends SimpleNode {
     this.parent.configs[r"$$appid"] = appid;
     this.parent.updateList(r"$$appid");
 
-    if (params['Request per Minutes'] is num &&
-        params['Request per Minutes'] > 0) {
-      maxCapacity = params['Request per Minutes'];
+    if (params['Requests per Minute'] is num &&
+        params['Requests per Minute'] > 0) {
+      maxCapacity = params['Request per Minute'];
     } else {
       maxCapacity = 60;
     }
