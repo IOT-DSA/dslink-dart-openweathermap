@@ -1,5 +1,8 @@
 part of dslink.weather.entry_point;
 
+// requests already used in previous minute
+num usedCapacity = 0;
+
 const interval = const Duration(seconds: 60);
 Timer loadingTimer;
 

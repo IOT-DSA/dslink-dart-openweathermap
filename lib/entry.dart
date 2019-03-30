@@ -25,8 +25,6 @@ String appid;
 
 // how many requests per minute
 num maxCapacity = 60;
-// requests already used in previous minute
-num usedCapacity = 0;
 
 main(List<String> args) async {
   httpClient = new HttpClient();
