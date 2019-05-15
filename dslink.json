@@ -1,6 +1,6 @@
 {
   "name": "dslink-dart-openweathermap",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Open Weather Map DSLink",
   "main": "bin/run.dart",
   "engines": {
