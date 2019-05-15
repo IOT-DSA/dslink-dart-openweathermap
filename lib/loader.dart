@@ -76,21 +76,26 @@ queryCity(String city, String unit) async {
 }
 
 loadCurrent(SimpleNode node) async {
-  var cityId = node.configs[r'$cityId'];
-  if (cityId is! num) {
-    return;
-  }
+  try {
+    var cityId = node.configs[r'$cityId'];
+    if (cityId is! num) {
+      return;
+    }
 
-  var query = buildQuery(node, node, 'weather');
-  if (query == null) {
-    return;
+    var query = buildQuery(node, node, 'weather');
+    if (query == null) {
+      return;
+    }
+    var data = await queryWeather(query);
+    updateCurrent(node, data);
+  } catch (e, stack) {
+    logger.warning(e);
+    logger.warning(stack);
   }
-  var data = await queryWeather(query);
-  updateCurrent(node, data);
 }
 
 updateCurrent(SimpleNode node, Map<String, dynamic> data) {
-  if (node == null) {
+  if (node == null || data == null) {
     return;
   }
   SimpleNode c(String name) {
@@ -136,26 +141,35 @@ loadForecast5(Forecast5Node node) async {
   if (node == null) {
     return;
   }
-
-  var query = buildQuery(node.parent, node, 'forecast');
-  if (query == null) {
-    return;
+  try {
+    var query = buildQuery(node.parent, node, 'forecast');
+    if (query == null) {
+      return;
+    }
+    var data = await queryWeather(query);
+    node.setCache(data);
+  } catch (e, stack) {
+    logger.warning(e);
+    logger.warning(stack);
   }
-  var data = await queryWeather(query);
-  node.setCache(data);
 }
 
 loadForecast16(Forecast16Node node) async {
   if (node == null) {
     return;
   }
-  var query = buildQuery(node.parent, node, 'forecast/daily');
-  if (query == null) {
-    return;
+  try {
+    var query = buildQuery(node.parent, node, 'forecast/daily');
+    if (query == null) {
+      return;
+    }
+    query = '${query}&cnt=16';
+    var data = await queryWeather(query);
+    node.setCache(data);
+  } catch (e, stack) {
+    logger.warning(e);
+    logger.warning(stack);
   }
-  query = '${query}&cnt=16';
-  var data = await queryWeather(query);
-  node.setCache(data);
 }
 
 const String urlBase = "https://api.openweathermap.org/data/2.5/";
